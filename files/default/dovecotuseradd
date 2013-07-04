@@ -1,0 +1,45 @@
+#!/bin/bash
+if [ ! $# = 1 ]
+ then
+  echo "Usage: $0 username@domain"
+  exit 1
+ else
+  user=`echo "$1" | cut -f1 -d "@"`
+  domain=`echo "$1" | cut -s -f2 -d "@"`
+  if [ -x $domain ]
+   then
+    echo "No domain given\nUsage: $0 username@domain"
+    exit 2
+  fi
+  grep $user@$domain /etc/dovecot/passwd > /dev/null
+  RETVAL=$?
+  if [ $RETVAL -ne 0 ]
+  then  
+    HASH="$(mktemp)"
+    touch `echo $HASH`
+    dovecotpw -s SSHA256 > $HASH
+    echo "Adding user $user@$domain to /etc/dovecot/passwd"
+    echo "$user@$domain:$(cat $HASH)" >> /etc/dovecot/passwd
+    rm $HASH
+    # Create the needed Maildir directories
+    echo "Creating user directory /var/mail/$domain/$user"
+    # maildirmake.dovecot does only chown on user directory, we'll create domain directory instead
+    if [ ! -x /var/mail/$domain ]
+    then
+      mkdir /var/mail/$domain
+      chown vmail:vmail /var/mail/$domain
+      chmod 700 /var/mail/$domain
+    fi
+    /usr/bin/maildirmake.dovecot /var/mail/$domain/$user vmail:vmail
+    # Also make folders for Drafts, Sent, Junk and Trash
+    /usr/bin/maildirmake.dovecot /var/mail/$domain/$user/.Drafts vmail:vmail
+    /usr/bin/maildirmake.dovecot /var/mail/$domain/$user/.Sent vmail:vmail
+    /usr/bin/maildirmake.dovecot /var/mail/$domain/$user/.Junk vmail:vmail
+    /usr/bin/maildirmake.dovecot /var/mail/$domain/$user/.Trash vmail:vmail
+  else
+    echo "User already exists"
+    exit 1
+  fi
+fi
+
+exit 0

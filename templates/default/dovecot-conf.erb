@@ -1,0 +1,38 @@
+protocols = imap imaps
+log_path = <%= node['dovecot']['log_path'] %>
+log_timestamp = "%Y-%m-%d %H:%M:%S"
+syslog_facility = mail
+ssl = <%= node['dovecot']['ssl']['enabled'] %>
+ssl_cert_file = <%= node['dovecot']['ssl']['ssl_cert_file'] %>
+ssl_key_file = <%= node['dovecot']['ssl']['ssl_key_file'] %>
+mail_location = <%= node['dovecot']['mail_location']['type']+":"+node['dovecot']['mail_location']['directory']+node['dovecot']['mail_location']['expansions'] %>
+mail_privileged_group = mail
+protocol imap {
+    <% node['dovecot']['imap'].each_pair do |option,value| -%>
+    <% if (value == "") then %>
+    <%= option %>
+    <% else %>
+    <%= option %> = <%= value %>
+    <% end %>
+    <% end %>
+}
+auth default {
+    mechanisms = <%= node['dovecot']['auth']['mechanisms'] %>
+    <% node['dovecot']['auth']['passdbs']['types'].each_pair do |pdbtype, options| -%>
+    passdb <%= pdbtype %> {
+        args = <%= options %>
+    }
+    <% end -%>
+    <% node['dovecot']['auth']['userdbs']['types'].each_pair do |udbtype, options| -%>
+    userdb <%= udbtype %> {
+        args = <%= options %>
+    }
+    <% end -%>
+    user = root
+    socket listen {
+        client {
+            path = /var/run/dovecot/auth-client
+            mode = 0666
+            }
+    }
+}
